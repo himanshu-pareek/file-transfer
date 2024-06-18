@@ -1,7 +1,10 @@
 import 'dart:io';
 
+import 'package:file_transfer/src/connections/socket_list_provider.dart';
+import 'package:file_transfer/src/connections/socket_list_widget.dart';
 import 'package:file_transfer/src/home/my_address_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.title});
@@ -13,16 +16,12 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _counter = 0;
+  ServerSocket? _socket;
+  SocketListProvider? _socketListProvider;
 
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
-
-  Future<ServerSocket> _getSocket() {
-    return ServerSocket.bind(InternetAddress.anyIPv6, 0);
+  Future<ServerSocket> _getSocket() async {
+    _socket = await ServerSocket.bind(InternetAddress.anyIPv6, 8080);
+    return _socket!;
   }
 
   @override
@@ -32,23 +31,44 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
       ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: <Widget>[
-          FutureBuilder(future: _getSocket(), builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.done) {
-              if (snapshot.hasError) {
-                return ErrorWidget(snapshot.error!);
-              }
-              if (snapshot.data == null) {
-                return ErrorWidget('Socket is null');
-              }
-              return MyAddressWidget(port: snapshot.data!.port);
+      body: FutureBuilder(
+        future: _getSocket(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            if (snapshot.hasError) {
+              return ErrorWidget(snapshot.error!);
             }
-            return const CircularProgressIndicator();
-          }),
-        ],
+            if (snapshot.data == null) {
+              return ErrorWidget('Socket is null');
+            }
+            return _buildWidget();
+          }
+          return const CircularProgressIndicator();
+        },
       ),
+    );
+  }
+
+  @override
+  void dispose() {
+    if (_socket != null) {
+      _socket!.close();
+    }
+    super.dispose();
+  }
+
+  Widget _buildWidget() {
+    _socketListProvider = SocketListProvider();
+    _socket!.listen((socket) {
+      _socketListProvider!.addSocket(socket);
+      socket.write('Welcome User ${_socketListProvider!.sockets.length}');
+    });
+    return Column(
+      children: [
+        MyAddressWidget(port: _socket!.port),
+        ListenableProvider(
+            create: (_) => _socketListProvider!, child: SocketListWidget()),
+      ],
     );
   }
 }
