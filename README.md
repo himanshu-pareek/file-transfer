@@ -1,6 +1,6 @@
-# file_transfer
+# File transfer app
 
-An app to share files between different devices over network without using any additional server.
+An app to share files between different devices over the network without using any additional server.
 
 ## Getting Started
 
